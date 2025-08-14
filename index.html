@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ヤバい、なんてもんじゃない。 – YABA INPUT</title>
+<meta name="theme-color" content="#e0ea00" />
+<style>
+  :root{
+    --accent:#e0ea00;
+    --bg:#ffffff;
+    --fg:#111;
+    --chip-bg:#111;
+    --chip-fg:#fff;
+    --maxw:520px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--fg); background:var(--bg);
+    display:flex; justify-content:center;
+  }
+  .frame{width:100%; max-width:var(--maxw); min-height:100svh; display:flex; flex-direction:column;}
+
+  /* clouds */
+  .cloud,.footerCloud{padding:14px; display:flex; flex-wrap:wrap; gap:10px}
+  .cloud{flex:0 0 auto}
+  .footerCloud{flex:1 1 auto; overflow:auto; font-size:14px}
+  .chip{
+    background:var(--chip-bg); color:var(--chip-fg);
+    font-weight:600; font-size:14px; line-height:1;
+    padding:8px 10px; border-radius:999px;
+  }
+
+  /* middle band */
+  .band{
+    background:var(--accent);
+    padding:28px 18px;
+    flex:0 0 50svh; /* 黄色部分はそのまま半分程度 */
+    display:flex; flex-direction:column; justify-content:center;
+  }
+  .headline{
+    font-weight:900;
+    font-size:clamp(22px,6vw,30px);
+    margin:0 0 24px;
+  }
+
+  /* larger input row */
+  .inputRow{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border-radius:20px;
+    padding:18px 18px; box-shadow:0 4px 14px rgba(0,0,0,.10);
+  }
+  .hash{font-weight:900; font-size:30px}
+  input[type="text"]{
+    border:none; outline:none; width:100%;
+    font-size:28px; letter-spacing:.02em;
+  }
+  .btn{
+    appearance:none; border:none; border-radius:14px;
+    padding:14px 16px; font-weight:800; font-size:16px;
+    background:#111; color:#fff;
+  }
+  .hint{margin:12px 2px 0; font-size:13px; color:#1f2937; opacity:.85}
+
+  /* snackbar */
+  .snack{position:fixed; inset:auto 0 18px 0; display:flex; justify-content:center; pointer-events:none}
+  .snack>div{background:#111; color:#fff; padding:12px 16px; border-radius:999px; font-size:15px; opacity:0; transform:translateY(8px); transition:.25s}
+  .snack.show>div{opacity:1; transform:translateY(0)}
+</style>
+</head>
+<body>
+  <main class="frame" role="main">
+    <section class="cloud" id="topCloud" aria-live="polite"></section>
+
+    <section class="band" role="region" aria-label="投稿">
+      <h1 class="headline">ヤバいなんて、もんじゃない。</h1>
+      <form id="yabaForm" class="inputRow" autocomplete="off">
+        <span class="hash">#</span>
+        <input id="yabaInput" type="text" inputmode="text" maxlength="24" placeholder="＿＿＿＿＿＿＿＿" aria-label="ヤバ語を入力" />
+        <button class="btn" type="submit">投稿</button>
+      </form>
+      <p class="hint">※ 個人情報・誹謗中傷は投稿しないでください。投稿はこの端末内（localStorage）のみに保存されます。</p>
+    </section>
+
+    <section class="footerCloud" id="bottomCloud" aria-live="polite"></section>
+  </main>
+
+  <div class="snack" id="snack" aria-hidden="true"><div>追加しました</div></div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "yabaTags_v1";
+  const seedTop = ["#次元崩壊","#ヤバ杉蓮","#作者としてサインしていいですか","#ヤンババイ","#倍ヤバい"];
+  const seedBottom = ["#タバコ臭","#ちびった","#レベルが違う","#恐竜","#血液沸騰","#ザヤクザ","#日岡覚醒！"];
+
+  const load = () => {
+    try{
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      return {
+        top: Array.isArray(saved.top) ? saved.top : seedTop,
+        bottom: Array.isArray(saved.bottom) ? saved.bottom : seedBottom
+      };
+    }catch{ return { top: seedTop, bottom: seedBottom }; }
+  };
+  const state = load();
+
+  const topCloud = document.getElementById("topCloud");
+  const bottomCloud = document.getElementById("bottomCloud");
+
+  const chip = (text)=>{
+    const span=document.createElement("span");
+    span.className="chip";
+    span.textContent = text.startsWith("#") ? text : `#${text}`;
+    return span;
+  };
+
+  const render = ()=>{
+    const ft = document.createDocumentFragment();
+    state.top.slice(0,24).forEach(t=>ft.appendChild(chip(t)));
+    topCloud.innerHTML=""; topCloud.appendChild(ft);
+
+    const fb = document.createDocumentFragment();
+    state.bottom.slice(0,40).forEach(t=>fb.appendChild(chip(t)));
+    bottomCloud.innerHTML=""; bottomCloud.appendChild(fb);
+  };
+
+  const save = ()=>localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+  const normalize = (s)=>{
+    s=(s||"").trim().replace(/^#+/,"").replace(/\s+/g,"");
+    const banned=[/https?:\/\//i,/@/];
+    if(banned.some(rx=>rx.test(s))) return "";
+    return s.slice(0,24);
+  };
+
+  const form = document.getElementById("yabaForm");
+  const input = document.getElementById("yabaInput");
+
+  form.addEventListener("submit",(e)=>{
+    e.preventDefault();
+    const v = normalize(input.value);
+    if(!v){ ping("入力してください"); return; }
+    const tag = `#${v}`;
+    state.top = [tag, ...state.top.filter(t=>t!==tag)];
+    state.bottom = [tag, ...state.bottom.filter(t=>t!==tag)];
+    save(); render(); input.value=""; ping("追加しました");
+  });
+
+  const snack = document.getElementById("snack");
+  let timer=null;
+  function ping(msg){
+    snack.firstElementChild.textContent=msg;
+    snack.classList.add("show");
+    clearTimeout(timer);
+    timer=setTimeout(()=>snack.classList.remove("show"),1500);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
